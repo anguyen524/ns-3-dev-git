@@ -856,6 +856,11 @@ protected:
   void DupAck ();
 
   /**
+   * \brief Limited transmit algorithm
+   */
+  void LimitedTransmit ();
+
+  /**
    * \brief Call Retransmit() upon RTO event
    */
   virtual void ReTxTimeout (void);

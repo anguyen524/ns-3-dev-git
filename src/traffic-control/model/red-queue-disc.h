@@ -309,8 +309,7 @@ private:
   Time m_lastSet;           //!< Last time m_curMaxP was updated
   double m_vProb;           //!< Prob. of packet drop
   uint32_t m_countBytes;    //!< Number of bytes since last drop
-  uint32_t m_old;           //!< 0 when average queue first exceeds threshold
-  uint32_t m_idle;          //!< 0/1 idle status
+  bool m_old;               //!< when average queue first exceeds threshold
   double m_ptc;             //!< packet time constant in packets/second
   double m_qAvg;            //!< Average queue length
   uint32_t m_count;         //!< Number of packets since last random number generation

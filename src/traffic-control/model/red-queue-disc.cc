@@ -322,7 +322,7 @@ RedQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   // simulate number of packets arrival during idle period
   uint32_t m = 0;
 
-  if (m_idle == 1)
+  if (nQueued == 0)
     {
       NS_LOG_DEBUG ("RED Queue Disc is idle.");
       Time now = Simulator::Now ();
@@ -337,7 +337,7 @@ RedQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           m = uint32_t (m_ptc * (now - m_idleTime).GetSeconds ());
         }
 
-      m_idle = 0;
+      m_idleTime = Time::Min (); // not idle anymore
     }
 
   m_qAvg = Estimator (nQueued, m + 1, m_qAvg, m_qW);
@@ -357,7 +357,7 @@ RedQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           NS_LOG_DEBUG ("adding DROP FORCED MARK");
           dropType = DTYPE_FORCED;
         }
-      else if (m_old == 0)
+      else if (!m_old)
         {
           /* 
            * The average queue size has just crossed the
@@ -367,7 +367,7 @@ RedQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
            */
           m_count = 1;
           m_countBytes = item->GetPacketSize ();
-          m_old = 1;
+          m_old = true;
         }
       else if (DropEarly (item, nQueued))
         {
@@ -379,7 +379,7 @@ RedQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
     {
       // No packets are being dropped
       m_vProb = 0.0;
-      m_old = 0;
+      m_old = false;
     }
 
   if ((GetMode () == Queue::QUEUE_MODE_PACKETS && nQueued >= m_queueLimit) ||
@@ -475,8 +475,7 @@ RedQueueDisc::InitializeParams (void)
   m_qAvg = 0.0;
   m_count = 0;
   m_countBytes = 0;
-  m_old = 0;
-  m_idle = 1;
+  m_old = false;
 
   double th_diff = (m_maxTh - m_minTh);
   if (th_diff == 0)
@@ -492,7 +491,7 @@ RedQueueDisc::InitializeParams (void)
       m_vC = (1.0 - m_curMaxP) / m_maxTh;
       m_vD = 2.0 * m_curMaxP - 1.0;
     }
-  m_idleTime = NanoSeconds (0);
+  m_idleTime = Time::Min ();
 
 /*
  * If m_qW=0, set it to a reasonable value of 1-exp(-1/C)
@@ -769,37 +768,27 @@ RedQueueDisc::DoDequeue (void)
 {
   NS_LOG_FUNCTION (this);
 
-  if (GetInternalQueue (0)->IsEmpty ())
+  Ptr<QueueDiscItem> item = StaticCast<QueueDiscItem> (GetInternalQueue (0)->Dequeue ());
+
+  NS_LOG_LOGIC ("Popped " << item);
+
+  NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
+  NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
+
+  if (GetInternalQueue (0)->IsEmpty ()
+      && m_idleTime == Time::Min ())
     {
-      NS_LOG_LOGIC ("Queue empty");
-      m_idle = 1;
       m_idleTime = Simulator::Now ();
-
-      return 0;
     }
-  else
-    {
-      m_idle = 0;
-      Ptr<QueueDiscItem> item = StaticCast<QueueDiscItem> (GetInternalQueue (0)->Dequeue ());
 
-      NS_LOG_LOGIC ("Popped " << item);
 
-      NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
-      NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
-
-      return item;
-    }
+  return item;
 }
 
 Ptr<const QueueDiscItem>
 RedQueueDisc::DoPeek (void) const
 {
   NS_LOG_FUNCTION (this);
-  if (GetInternalQueue (0)->IsEmpty ())
-    {
-      NS_LOG_LOGIC ("Queue empty");
-      return 0;
-    }
 
   Ptr<const QueueDiscItem> item = StaticCast<const QueueDiscItem> (GetInternalQueue (0)->Peek ());
 
